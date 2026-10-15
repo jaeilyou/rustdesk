@@ -48,6 +48,9 @@ jobs:
           git push origin HEAD:master
 
       - name: Trigger Flutter Nightly Build
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_PAT }}
+          GITHUB_TOKEN: ${{ secrets.SYNC_PAT }}
         run: |
-          echo "${{ secrets.SYNC_PAT }}" | gh auth login --with-token
-          gh workflow run flutter-nightly.yml --ref master
+          unset GH_ENTERPRISE_TOKEN
+          gh workflow run flutter-nightly.yml --ref master --repo jaeilyou/rustdesk
