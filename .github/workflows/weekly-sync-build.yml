@@ -1,0 +1,53 @@
+name: Weekly Sync and Build
+
+on:
+  schedule:
+    - cron: '0 19 * * 0'   # 매주 일요일 19:00 UTC = 월요일 04:00 KST
+  workflow_dispatch:
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout rustdesk fork
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SYNC_PAT }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "jaeilyou"
+          git config user.email "jaeilyou@gmail.com"
+
+      - name: Sync hbb_common custom-server branch with upstream
+        run: |
+          cd libs/hbb_common
+          git fetch origin custom-server
+          git checkout -B custom-server origin/custom-server
+          git remote add upstream https://github.com/rustdesk/hbb_common.git || true
+          git fetch upstream main
+          git merge upstream/main --no-edit
+          git push origin HEAD:custom-server
+
+      - name: Sync rustdesk master with upstream and bump submodule
+        run: |
+          git fetch origin master
+          git checkout -B master origin/master
+          git remote add upstream https://github.com/rustdesk/rustdesk.git || true
+          git fetch upstream master
+          git merge upstream/master --no-edit
+          cd libs/hbb_common
+          git fetch origin custom-server
+          git checkout custom-server
+          git pull origin custom-server
+          cd ../..
+          git add libs/hbb_common
+          git commit -m "weekly sync: upstream merge + custom config" --allow-empty
+          git push origin HEAD:master
+
+      - name: Trigger Flutter Nightly Build
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_PAT }}
+        run: gh workflow run flutter-nightly.yml --ref master
